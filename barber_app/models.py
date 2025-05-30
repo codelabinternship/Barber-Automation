@@ -8,11 +8,6 @@ from django.utils import timezone
 
 
 
-
-
-
-
-
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('admin', 'Admin'),
