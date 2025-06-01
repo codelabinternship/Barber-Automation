@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'barber_app',
     'telegram_bot',
+    'rest_framework',
+    'drf_yasg',
 ]
 
 # bot token
