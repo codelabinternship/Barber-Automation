@@ -9,7 +9,7 @@ from .models import *
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = '__all__'
+        fields = 'id', 'username', 'email', 'phone_number'
 
 
 
@@ -24,21 +24,21 @@ class CustomUserSerializer(serializers.ModelSerializer):
 class RegionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Region
-        fields = '__all__'
+        fields = 'name'
 
 
 
 class BarberSerializer(serializers.ModelSerializer):
     class Meta:
         model = Barber
-        fields = '_all__'
+        fields = 'user, region, bio, rating, created_at'
 
 
 
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = '__all__'
+        fields = 'name ,  default_price '
 
 
 
@@ -47,7 +47,7 @@ class BarberServiceSerializer(serializers):
     service = ServiceSerializer
     class Meta:
         model = BarberService
-        fields = '__all_'
+        fields = 'barber, service, price '
 
 
 
@@ -55,5 +55,5 @@ class BarberServiceSerializer(serializers):
 class ScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = ''
+        fields = 'barber, weekday, start_time,  end_time '
 
