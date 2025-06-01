@@ -66,22 +66,27 @@ User = get_user_model()
 
 
 
+from rest_framework import serializers
+from .models import CustomUser
+
 class AdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = User
+        model = CustomUser
         fields = ['username', 'email', 'password']
 
     def create(self, validated_data):
-        user = User(
+        user = CustomUser(
             username=validated_data['username'],
             email=validated_data['email'],
+            role='admin'
         )
         user.set_password(validated_data['password'])
-        user.role = 'admin'
         user.save()
         return user
+
+
 
 
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -103,4 +108,61 @@ class DevPasswordResetSerializer(serializers.Serializer):
 
     def validate_new_password(self, value):
         return value
+
+
+from rest_framework import serializers
+
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+
+class UserSessionSerializer(serializers.ModelSerializer):
+    user_telegram_id = serializers.CharField(source='user.telegram_id', read_only=True)
+
+    class Meta:
+        model = UserSession
+        fields = ['id', 'user', 'user_telegram_id', 'session_data', 'created_at', 'updated_at']
+
+
+
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
+        fields = ['user', 'barber', 'service', ' scheduled_time', 'status', 'notes', 'created_at']
+
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['appointment', 'amount', 'transaction_id','status','paid_at']
+
+
+class ReminderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reminder
+        field = ['method','sent_at', 'status', 'send_time','user',' appointment']
+
+
+
+class AppointmentHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppointmentHistory
+        field = ['appointment','user', 'action','notes', 'created_at']
+
+
+class AppointmentListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppointmentList
+        field = ['user', 'barber', 'created_at']
+
+
+class AdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Admin
+        field = ['user', 'role', 'create_at']
 

@@ -14,17 +14,34 @@ from barber_app.serializers import (
 User = get_user_model()
 
 
+# views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+from barber_app.serializers import RegisterSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
 class RegisterView(APIView):
+
+    @swagger_auto_schema(request_body=RegisterSerializer)
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        email = request.data.get('email')
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            username = serializer.validated_data['username']
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
 
-        if User.objects.filter(username=username).exists():
-            return Response({'error': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
+            if User.objects.filter(username=username).exists():
+                return Response({'error': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.create_user(username=username, email=email, password=password)
-        return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+            User.objects.create_user(username=username, email=email, password=password)
+            return Response({'message': 'User created successfully'}, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class LoginView(TokenObtainPairView):
@@ -32,7 +49,7 @@ class LoginView(TokenObtainPairView):
 
 
 class MeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         serializer = CustomUserSerializer(request.user)
@@ -40,29 +57,36 @@ class MeView(APIView):
 
 
 class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data)
 
 
-class CreateAdminBySuperadminView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions, status
+from .serializers import AdminCreateSerializer
+from .models import CustomUser
 
+
+class CreateAdminBySuperadminView(APIView):
+    permission_classes = [permissions.AllowAny]
     def post(self, request):
-        if request.user.role != 'superadmin':
-            return Response({'error': 'Only superadmin can create admin'}, status=403)
+        if request.user.role != 'super_admin':
+            return Response({'error': 'Only super_admin can create admin'}, status=403)
 
         serializer = AdminCreateSerializer(data=request.data)
         if serializer.is_valid():
-            admin = serializer.save(role='admin')
+            admin = serializer.save()
             return Response({'message': 'Admin user created successfully'}, status=201)
         return Response(serializer.errors, status=400)
 
 
+
 class ResetPasswordView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         role = request.user.role
@@ -115,7 +139,7 @@ class DevPasswordResetView(APIView):
         return Response(serializer.errors, status=400)
 
 class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         serializer = CustomUserSerializer(request.user)
@@ -127,3 +151,4 @@ class ProfileView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'drf_yasg',
 ]
 
+
 # bot token
 TELEGRAM_BOT_TOKEN = '8175015666:AAHVOoskTC8oNY4g5i2z4mUSFpUqDQtAaTM'
 
