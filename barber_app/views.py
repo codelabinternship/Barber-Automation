@@ -14,55 +14,110 @@ from barber_app.serializers import (
 User = get_user_model()
 
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+from barber_app.serializers import RegisterSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
 class RegisterView(APIView):
+
+    @swagger_auto_schema(request_body=RegisterSerializer)
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        email = request.data.get('email')
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            username = serializer.validated_data['username']
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
 
-        if User.objects.filter(username=username).exists():
-            return Response({'error': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
+            if User.objects.filter(username=username).exists():
+                return Response({'error': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.create_user(username=username, email=email, password=password)
-        return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+            User.objects.create_user(username=username, email=email, password=password)
+            return Response({'message': 'User created successfully'}, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class LoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainSerializer
 
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+
+
+# barber_app/views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
+class MyView(APIView):
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'q', openapi.IN_QUERY,
+                description="Qidiruv parametri",
+                type=openapi.TYPE_STRING
+            )
+        ]
+    )
+    def get(self, request):
+        q = request.query_params.get('q', '')
+        return Response({"search": q})
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
 
 class MeView(APIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
-        serializer = CustomUserSerializer(request.user)
-        return Response(serializer.data)
+        return Response({"message": "Hello from MeView"})
+
+
 
 
 class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data)
 
 
-class CreateAdminBySuperadminView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions, status
+from .serializers import AdminCreateSerializer
+from .models import CustomUser
 
+
+class CreateAdminBySuperadminView(APIView):
+    permission_classes = [permissions.AllowAny]
     def post(self, request):
-        if request.user.role != 'superadmin':
-            return Response({'error': 'Only superadmin can create admin'}, status=403)
+        if request.user.role != 'super_admin':
+            return Response({'error': 'Only super_admin can create admin'}, status=403)
 
         serializer = AdminCreateSerializer(data=request.data)
         if serializer.is_valid():
-            admin = serializer.save(role='admin')
+            admin = serializer.save()
             return Response({'message': 'Admin user created successfully'}, status=201)
         return Response(serializer.errors, status=400)
 
 
+
 class ResetPasswordView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         role = request.user.role
@@ -114,16 +169,86 @@ class DevPasswordResetView(APIView):
             return Response({'detail': 'Password reset successfully.'})
         return Response(serializer.errors, status=400)
 
+
+
+from .permissions import IsSuperAdminOrDev
+
+class AdminUserViewSet(APIView):
+    serializer_class = AdminCreateSerializer
+    permission_classes = [IsSuperAdminOrDev]
+
+    def get_queryset(self):
+        # Only show admins (not super_admins)
+        user = self.request.user
+        if user.role == "dev":
+            return CustomUser.objects.filter(role__in=["admin", "super_admin"])
+        return CustomUser.objects.filter(role="admin")
+
+    def perform_create(self, serializer):
+        # Only dev can create super_admin, otherwise always admin
+        role = self.request.data.get("role", "admin")
+        if role == "super_admin":
+            if self.request.user.role == "dev":
+                serializer.save(role="super_admin")
+            else:
+                serializer.save(role="admin")
+        else:
+            serializer.save(role="admin")
+
+    def perform_update(self, serializer):
+        # Only dev can update role to super_admin
+        role = self.request.data.get("role")
+        if role == "super_admin" and self.request.user.role == "dev":
+            serializer.save(role="super_admin")
+        else:
+            serializer.save(role="admin")
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .serializers import ProfileSerializer
+
+
+
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = ProfileSerializer  # for schema generation
 
     def get(self, request):
-        serializer = CustomUserSerializer(request.user)
+        serializer = self.serializer_class(request.user)
         return Response(serializer.data)
 
     def put(self, request):
-        serializer = CustomUserSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
+        serializer = self.serializer_class(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        password = serializer.validated_data.pop('password', None)
+        if password:
+            request.user.set_password(password)
+        serializer.save()
+        return Response(serializer.data)
+
+
+# barber_app/views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
+class GetMeView(APIView):
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'q',
+                openapi.IN_QUERY,
+                description="Qidiruv parametri",
+                type=openapi.TYPE_STRING
+            )
+        ]
+    )
+    def get(self, request):
+        q = request.query_params.get('q')
+        return Response({"query": q})
